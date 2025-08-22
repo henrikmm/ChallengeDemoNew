@@ -76,7 +76,7 @@ async def solar_query(request: SolarQueryRequest):
     - Includes period summary
     """
     try:
-        result = solar_tools.query_generation(request.start_date, request.end_date)
+        result = await solar_tools.query_generation(request.start_date, request.end_date)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error querying solar data: {str(e)}")
@@ -93,7 +93,7 @@ async def solar_stats():
     - Complete performance overview
     """
     try:
-        stats = solar_tools.get_solar_stats()
+        stats = await solar_tools.get_solar_stats()
         if "error" in stats:
             raise HTTPException(status_code=500, detail=stats["error"])
         return SolarStatsResponse(**stats)
@@ -110,11 +110,10 @@ async def battery_status():
     - Current charge level
     - Charging/discharging status
     - Energy flow direction
-    
-    ⚠️ Note: Currently using placeholder data. Will be integrated with real solar inverter data.
+    Data is sourced directly from the GoodWe SEMS portal.
     """
     try:
-        status = battery.get_batery_usage()
+        status = await battery.get_batery_usage()
         return status
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting battery status: {str(e)}")
@@ -129,11 +128,10 @@ async def battery_energy_flow():
     - Active energy destinations
     - Power distribution overview
     - Load management insights
-    
-    ⚠️ Note: Placeholder implementation - real inverter integration coming soon.
+    Powered by live data from the GoodWe SEMS portal.
     """
     try:
-        flow = battery.check_battery_energy_flow()
+        flow = await battery.check_battery_energy_flow()
         return flow
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking battery energy flow: {str(e)}")

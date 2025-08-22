@@ -110,8 +110,7 @@ async def battery_status():
     - Current charge level
     - Charging/discharging status
     - Energy flow direction
-    
-    ⚠️ Note: Currently using placeholder data. Will be integrated with real solar inverter data.
+    Data is sourced directly from the GoodWe SEMS portal.
     """
     try:
         status = await battery.get_batery_usage()
@@ -129,8 +128,7 @@ async def battery_energy_flow():
     - Active energy destinations
     - Power distribution overview
     - Load management insights
-    
-    ⚠️ Note: Placeholder implementation - real inverter integration coming soon.
+    Powered by live data from the GoodWe SEMS portal.
     """
     try:
         flow = await battery.check_battery_energy_flow()

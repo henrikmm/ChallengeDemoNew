@@ -1,50 +1,51 @@
-import pandas as pd
-import os
+from datetime import datetime, timedelta
+from .goodwe_client import client
 
-# Load the solar generation data
-try:
-    DATA = pd.read_csv("solar_generation.csv", parse_dates=["date"])
-    print("✅ Solar generation data loaded successfully!")
-except FileNotFoundError:
-    print("❌ Solar generation data not found!")
-    DATA = pd.DataFrame()
 
-def query_generation(start_date: str, end_date: str | None = None) -> dict:
-    """
-    Retorna o total de kWh gerados entre start_date e end_date, inclusive.
-    Se end_date for omitido, assuma um único dia.
-    """
-    if DATA.empty:
-        return {"kwh": 0, "error": "No data available"}
-    
-    try:
-        sd = pd.to_datetime(start_date)
-        ed = pd.to_datetime(end_date) if end_date else sd
-        mask = (DATA["date"] >= sd) & (DATA["date"] <= ed)
-        total = DATA.loc[mask, "energy_kwh"].sum().round(2)
-        return {"kwh": total, "period": f"{start_date} to {end_date or start_date}"}
-    except Exception as e:
-        return {"kwh": 0, "error": str(e)}
+def _parse_chart_energy(chart: dict) -> float:
+    points = chart.get("chart", [])
+    if not points:
+        return 0.0
+    day_kwh = 0.0
+    prev_time = None
+    for ts, power in points:
+        t = datetime.fromisoformat(ts)
+        if prev_time is not None:
+            hours = (t - prev_time).total_seconds() / 3600.0
+            day_kwh += power * hours / 1000.0
+        prev_time = t
+    return day_kwh
 
-def get_solar_stats() -> dict:
-    """
-    Retorna estatísticas gerais sobre a geração solar
-    """
-    if DATA.empty:
+
+async def query_generation(start_date: str, end_date: str | None = None) -> dict:
+    sd = datetime.fromisoformat(start_date).date()
+    ed = datetime.fromisoformat(end_date).date() if end_date else sd
+    total = 0.0
+    current = sd
+    while current <= ed:
+        chart = await client.get_power_chart(datetime.combine(current, datetime.min.time()))
+        total += _parse_chart_energy(chart)
+        current += timedelta(days=1)
+    return {"kwh": round(total, 2), "period": f"{start_date} to {end_date or start_date}"}
+
+
+async def get_solar_stats() -> dict:
+    today = datetime.now().date()
+    daily_values = []
+    for i in range(7):
+        day = today - timedelta(days=i)
+        chart = await client.get_power_chart(datetime.combine(day, datetime.min.time()))
+        daily_values.append(_parse_chart_energy(chart))
+    if not daily_values:
         return {"error": "No data available"}
-    
-    try:
-        total_generation = DATA["energy_kwh"].sum().round(2)
-        avg_daily = DATA["energy_kwh"].mean().round(2)
-        max_daily = DATA["energy_kwh"].max().round(2)
-        min_daily = DATA["energy_kwh"].min().round(2)
-        
-        return {
-            "total_kwh": total_generation,
-            "average_daily_kwh": avg_daily,
-            "max_daily_kwh": max_daily,
-            "min_daily_kwh": min_daily,
-            "total_days": len(DATA)
-        }
-    except Exception as e:
-        return {"error": str(e)} 
+    total_generation = sum(daily_values)
+    avg_daily = total_generation / len(daily_values)
+    max_daily = max(daily_values)
+    min_daily = min(daily_values)
+    return {
+        "total_kwh": round(total_generation, 2),
+        "average_daily_kwh": round(avg_daily, 2),
+        "max_daily_kwh": round(max_daily, 2),
+        "min_daily_kwh": round(min_daily, 2),
+        "total_days": len(daily_values),
+    }
